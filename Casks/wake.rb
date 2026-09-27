@@ -1,6 +1,6 @@
 cask "wake" do
-  version "0.2.2"
-  sha256 "a946e10e255975dbcbc0b277adb8a88191a4fc836c01196cdd052b0392da6327"
+  version "0.2.3"
+  sha256 "bba96c61ffda13a743a5cbbee29cddc6498c512442707f7467652ea5a183d66d"
 
   url "https://github.com/amiralibg/wake/releases/download/v#{version}/Wake-#{version}.zip"
   name "Wake"
