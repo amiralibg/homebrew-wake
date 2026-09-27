@@ -1,0 +1,42 @@
+# Moves Casks/wake.rb to the newest Wake release. Runs every three hours, or by
+# hand from the Actions tab. It reads the same appcast installed copies update
+# from, so the cask never points at a release the app itself doesn't offer.
+name: Update Wake
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-wake
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump the cask
+        run: |
+          APPCAST=$(curl -fsSL https://github.com/amiralibg/wake/releases/latest/download/appcast.xml)
+          VERSION=$(printf '%s' "$APPCAST" | sed -n 's/.*<sparkle:shortVersionString>\(.*\)<\/sparkle:shortVersionString>.*/\1/p' | head -1)
+          URL=$(printf '%s' "$APPCAST" | sed -n 's/.*<enclosure url="\([^"]*\)".*/\1/p' | head -1)
+          CURRENT=$(sed -n 's/^  version "\(.*\)"$/\1/p' Casks/wake.rb)
+          if [ -z "$VERSION" ] || [ -z "$URL" ]; then echo "::error::Couldn't read the appcast."; exit 1; fi
+          if [ "$VERSION" = "$CURRENT" ]; then echo "Up to date: $VERSION"; exit 0; fi
+          # The cask builds its URL from the version; make sure that's where the release is.
+          if [ "$URL" != "https://github.com/amiralibg/wake/releases/download/v$VERSION/Wake-$VERSION.zip" ]; then
+            echo "::error::The release's zip is at $URL, which the cask's url doesn't match."; exit 1
+          fi
+          curl -fsSL -o "$RUNNER_TEMP/Wake.zip" "$URL"
+          SHA256=$(sha256sum "$RUNNER_TEMP/Wake.zip" | cut -d' ' -f1)
+          sed -i -e "s/^  version \".*\"$/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"$/  sha256 \"$SHA256\"/" Casks/wake.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "wake $VERSION"
+          git push
